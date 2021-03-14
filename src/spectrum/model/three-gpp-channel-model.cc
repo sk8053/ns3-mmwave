@@ -235,6 +235,10 @@ ThreeGppChannelModel::GetTypeId (void)
                    DoubleValue (1),
                    MakeDoubleAccessor (&ThreeGppChannelModel::m_blockerSpeed),
                    MakeDoubleChecker<double> ())
+      .AddTraceSource ("RayTracing",
+                     "Trace for getting ray tracing data",
+                     MakeTraceSourceAccessor (&ThreeGppChannelModel::m_rxTrace),
+                     "ns3::Packet::RayTracingCallback")
     ;
   return tid;
 }
@@ -896,6 +900,7 @@ ThreeGppChannelModel::GetNewChannel (Vector locUT, bool los, bool o2i,
 
   //Step 5: Generate Delays.
   DoubleVector clusterDelay;
+  DoubleVector clusterDelay_copy;
   double minTau = 100.0;
   for (uint8_t cIndex = 0; cIndex < numOfCluster; cIndex++)
     {
@@ -905,6 +910,7 @@ ThreeGppChannelModel::GetNewChannel (Vector locUT, bool los, bool o2i,
           minTau = tau;
         }
       clusterDelay.push_back (tau);
+      clusterDelay_copy.push_back (tau);
     }
 
   for (uint8_t cIndex = 0; cIndex < numOfCluster; cIndex++)
@@ -976,6 +982,7 @@ ThreeGppChannelModel::GetNewChannel (Vector locUT, bool los, bool o2i,
           clusterPowerForAngles.erase (clusterPowerForAngles.begin () + cIndex - 1);
           clusterPower.erase (clusterPower.begin () + cIndex - 1);
           clusterDelay.erase (clusterDelay.begin () + cIndex - 1);
+          clusterDelay_copy.erase (clusterDelay_copy.begin () + cIndex - 1);
         }
     }
   uint8_t numReducedCluster = clusterPower.size ();
@@ -988,6 +995,7 @@ ThreeGppChannelModel::GetNewChannel (Vector locUT, bool los, bool o2i,
       for (uint8_t cIndex = 0; cIndex < numReducedCluster; cIndex++)
         {
           clusterDelay[cIndex] = clusterDelay[cIndex] / C_tau;             //(7.5-4)
+          clusterDelay_copy[cIndex] = clusterDelay_copy[cIndex] / C_tau;
         }
     }
 
@@ -1352,6 +1360,15 @@ ThreeGppChannelModel::GetNewChannel (Vector locUT, bool los, bool o2i,
 
   NS_LOG_INFO ("1st strongest cluster:" << (int)cluster1st << ", 2nd strongest cluster:" << (int)cluster2nd);
 
+  double cluster_delay[clusterDelay_copy.size()]; //sjkang
+  double cluster_power[clusterPower.size()];
+  for (uint16_t cIndex=0; cIndex<numReducedCluster; cIndex++){
+    cluster_delay[cIndex] = clusterDelay_copy[cIndex]*1e9;
+    cluster_power[cIndex] = clusterPower[cIndex];
+  }
+ 
+  NS_LOG_INFO(cluster_delay << cluster_power);
+
   Complex3DVector H_usn;  //channel coffecient H_usn[u][s][n];
   // NOTE Since each of the strongest 2 clusters are divided into 3 sub-clusters,
   // the total cluster will be numReducedCLuster + 4.
@@ -1366,6 +1383,26 @@ ThreeGppChannelModel::GetNewChannel (Vector locUT, bool los, bool o2i,
         }
     }
 
+   //  m_rxTrace(cluster_delay, cluster_power, rayZod_radian, rayZoa_radian, rayAod_radian, rayAoa_radian, numReducedCluster, raysPerCluster);
+   /*  uint16_t t_size = numReducedCluster * raysPerCluster;
+     uint8_t  k =0;
+    double rayZoa_radian_copy[t_size], rayZod_radian_copy[t_size], rayAoa_radian_copy[t_size], rayAod_radian_copy[t_size]; //sjkang
+    for (uint8_t nIndex = 0; nIndex < numReducedCluster; nIndex++)
+            {
+              for (uint8_t mIndex = 0; mIndex < raysPerCluster; mIndex++)
+              {
+                  rayZoa_radian_copy[k] = rayZoa_radian[nIndex][mIndex]*180/M_PI;
+                  rayZod_radian_copy[k] = rayZod_radian[nIndex][mIndex]*180/M_PI;
+                  rayAoa_radian_copy[k] = rayAoa_radian[nIndex][mIndex]*180/M_PI;
+                  rayAod_radian_copy[k] = rayAod_radian[nIndex][mIndex]*180/M_PI;
+                  //std::cout<<rayAoa_radian_copy[k];
+                  k ++;
+              }
+             // std::cout <<std::endl;
+            }
+   // std::cout << cluster_delay[0] <<'\t'<< cluster_power[0] <<std::endl;
+   m_rxTrace(cluster_delay, cluster_power, rayZod_radian_copy, rayZoa_radian_copy, rayAod_radian_copy, rayAoa_radian_copy, numReducedCluster, raysPerCluster);
+   */
   // The following for loops computes the channel coefficients
   for (uint64_t uIndex = 0; uIndex < uSize; uIndex++)
     {
@@ -1530,6 +1567,13 @@ ThreeGppChannelModel::GetNewChannel (Vector locUT, bool los, bool o2i,
 
       clusterZod.push_back (clusterZod[cluster1st]);
       clusterZod.push_back (clusterZod[cluster1st]);
+
+      clusterPower.push_back(clusterPower[cluster1st]);
+      clusterPower.push_back(clusterPower[cluster1st]);
+
+      clusterDelay_copy.push_back(clusterDelay_copy[cluster1st]);
+      clusterDelay_copy.push_back(clusterDelay_copy[cluster1st]);
+
     }
   else
     {
@@ -1569,11 +1613,40 @@ ThreeGppChannelModel::GetNewChannel (Vector locUT, bool los, bool o2i,
       clusterZod.push_back (clusterZod[max]);
       clusterZod.push_back (clusterZod[max]);
 
+      clusterPower.push_back(clusterPower[min]);
+      clusterPower.push_back(clusterPower[min]);
+      clusterPower.push_back(clusterPower[max]);
+      clusterPower.push_back(clusterPower[max]);
+
+
+      clusterDelay_copy.push_back(clusterDelay_copy[min]);
+      clusterDelay_copy.push_back(clusterDelay_copy[min]);
+      clusterDelay_copy.push_back(clusterDelay_copy[max]);
+      clusterDelay_copy.push_back(clusterDelay_copy[max]);
+
+
 
     }
 
   NS_LOG_INFO ("size of coefficient matrix =[" << H_usn.size () << "][" << H_usn[0].size () << "][" << H_usn[0][0].size () << "]");
+     // getting ray tracing data , sjkang
+     uint16_t t_size = clusterAod.size(); 
+    double clusterAod_copy[t_size], clusterAoa_copy[t_size], clusterZoa_copy[t_size], clusterZod_copy[t_size]; //sjkang
+    double clusterPower_copy[t_size], clusterDelay_copy2[t_size];
+    for (uint8_t nIndex = 0; nIndex < t_size; nIndex++)
+            {
 
+                  clusterAod_copy[nIndex] = clusterAod[nIndex];
+                  clusterAoa_copy[nIndex] = clusterAoa[nIndex];
+                  clusterZod_copy[nIndex] = clusterZod[nIndex];
+                  clusterZoa_copy[nIndex] = clusterZoa[nIndex];
+                  clusterDelay_copy2[nIndex] = clusterDelay_copy[nIndex]*1e9;
+                  clusterPower_copy[nIndex] =  clusterPower[nIndex];
+
+            }
+
+   m_rxTrace(clusterDelay_copy2, clusterPower_copy, clusterZod_copy, clusterZoa_copy, clusterAod_copy, clusterAoa_copy, t_size, raysPerCluster);
+  
   channelParams->m_channel = H_usn;
   channelParams->m_delay = clusterDelay;
 
@@ -1815,4 +1888,4 @@ ThreeGppChannelModel::AssignStreams (int64_t stream)
   return 2;
 }
 
-}  // namespace ns3
+}

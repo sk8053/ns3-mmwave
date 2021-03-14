@@ -31,7 +31,7 @@
 #include <unordered_map>
 #include <ns3/channel-condition-model.h>
 #include <ns3/matrix-based-channel-model.h>
-
+#include "ns3/traced-callback.h"
 namespace ns3 {
 
 class MobilityModel;
@@ -257,6 +257,7 @@ private:
   static const uint8_t THETA_INDEX = 2; //!< index of the THETA value in the m_nonSelfBlocking array
   static const uint8_t Y_INDEX = 3; //!< index of the Y value in the m_nonSelfBlocking array
   static const uint8_t R_INDEX = 4; //!< index of the R value in the m_nonSelfBlocking array
+  TracedCallback<double*, double*, double*, double*,double*,double*, int, int > m_rxTrace;
 };
 } // namespace ns3
 

@@ -721,7 +721,9 @@ public:
    */
   typedef void (* AddressTracedCallback)
     (Ptr<const Packet> packet, const Address &address);
-  
+
+  typedef void (* RayTracingCallBack)
+    (double*, double*, double*, double*,double*,double*, int, int ); //sjkang
    /**
     * TracedCallback signature for packet and source/destination addresses.
     *

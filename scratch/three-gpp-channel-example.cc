@@ -39,10 +39,14 @@
 #include "ns3/node-container.h"
 #include "ns3/mobility-model.h"
 #include "ns3/constant-position-mobility-model.h"
+#include "ns3/lte-spectrum-value-helper.h"
 #include "ns3/mmwave-spectrum-value-helper.h"
 #include "ns3/channel-condition-model.h"
 #include "ns3/three-gpp-propagation-loss-model.h"
-
+#include "ns3/mmwave-helper.h"
+#include "fstream"
+#include "iostream"
+#include <string>
 NS_LOG_COMPONENT_DEFINE ("ThreeGppChannelExample");
 
 using namespace ns3;
@@ -113,20 +117,21 @@ ComputeSnr (Ptr<MobilityModel> txMob, Ptr<MobilityModel> rxMob, double txPow, do
   {
     activeRbs0[i] = i;
   }
-  Ptr<SpectrumValue> txPsd = MmWaveSpectrumValueHelper::CreateTxPowerSpectralDensity (2100, 100, txPow, activeRbs0);
+  Ptr<SpectrumValue> txPsd = LteSpectrumValueHelper::CreateTxPowerSpectralDensity (2100, 100, txPow, activeRbs0);
   Ptr<SpectrumValue> rxPsd = txPsd->Copy ();
   NS_LOG_DEBUG ("Average tx power " << 10*log10(Sum (*txPsd) * 180e3) << " dB");
 
   // create the noise PSD
-  Ptr<SpectrumValue> noisePsd = MmWaveSpectrumValueHelper::CreateNoisePowerSpectralDensity (2100, 100, noiseFigure);
+  Ptr<SpectrumValue> noisePsd = LteSpectrumValueHelper::CreateNoisePowerSpectralDensity (2100, 100, noiseFigure);
   NS_LOG_DEBUG ("Average noise power " << 10*log10 (Sum (*noisePsd) * 180e3) << " dB");
 
   // apply the pathloss
   double propagationGainDb = m_propagationLossModel->CalcRxPower (0, txMob, rxMob);
-  NS_LOG_UNCOND ("Pathloss " << -propagationGainDb << " dB");
+  NS_LOG_DEBUG ("Pathloss " << -propagationGainDb << " dB");
   double propagationGainLinear = std::pow (10.0, (propagationGainDb) / 10.0);
   *(rxPsd) *= propagationGainLinear;
 
+  NS_LOG_DEBUG (10*log10((*(rxPsd))[0]*180e3));
   // apply the fast fading and the beamforming gain
   rxPsd = m_spectrumLossModel->CalcRxPowerSpectralDensity (rxPsd, txMob, rxMob);
   NS_LOG_DEBUG ("Average rx power " << 10*log10 (Sum (*rxPsd) * 180e3) << " dB");
@@ -141,19 +146,147 @@ ComputeSnr (Ptr<MobilityModel> txMob, Ptr<MobilityModel> rxMob, double txPow, do
   f.close ();
 }
 
+static void write_file_cluster_only(double *data, std::ofstream *f,  int n_cluster, std::string name){
+  //std::ofstream f;
+  //f.open ("ray_tracing.txt",  std::ios::app);
+  *f << name<<'\t';
+  for (uint8_t i = 0 ; i < n_cluster; i++)
+        *f<< *(data+i)<<'\t';  
+  
+    *f << std::endl;
+
+
+}
+
+/*static void write_file(double *data, std::ofstream *f,  bool angle, int n_cluster, int n_rays, std::string name){
+  //std::ofstream f;
+  //f.open ("ray_tracing.txt",  std::ios::app);
+  uint8_t k = 0;
+  *f << name<<'\t';
+  for (uint8_t i = 0 ; i < n_cluster; i++){
+    
+    for (uint8_t j = 0; j<n_rays;j++){
+      if (angle == true)
+        *f<< *(data+k)<<'\t';
+      else
+        *f<< *(data+i)<<'\t';
+      k++;
+    }
+    }
+    *f << std::endl;
+    *f << std::endl;
+
+}*/
+
+
+
+static void RayTracing ( Ptr<MobilityModel> * MobPair, double* delay, double * power, double* zod, double*zoa, double* aod, double* aoa, int n_cluster, int n_rays)
+{
+  double  Pathloss_gain[n_cluster];
+  double Zod_c[n_cluster], Zoa_c[n_cluster], Aod_c[n_cluster], Aoa_c[n_cluster];
+
+  //double Zod[n_cluster][n_rays], Zoa[n_cluster][n_rays], Aod[n_cluster][n_rays], Aoa[n_cluster][n_rays];
+
+  Ptr<MobilityModel> txMob  = *MobPair;
+  Ptr<MobilityModel> rxMob = *(MobPair+1);
+  double propagationGainDb = -1* m_propagationLossModel->CalcRxPower (0, txMob, rxMob);
+    Ptr<ChannelConditionModel> cond_model = m_propagationLossModel->GetChannelConditionModel();
+
+  // for loops for priting data and computing power by adding propgation loss
+  //uint8_t k = 0;
+  for (uint8_t i = 0 ; i < n_cluster; i++){
+ 
+    Pathloss_gain[i] = -10*log10(*(power+i)) + propagationGainDb;
+   // for (uint8_t j = 0; j<n_rays;j++){
+   //   Zod[i][j] = *(zod+k);
+   //   Zoa[i][j] = *(zoa+k);
+    //  Aod[i][j] = *(aod+k);
+    //  Aoa[i][j] = *(aoa+k);
+    //  k++;
+     // }
+      // sampling one ray per cluster
+      Zod_c[i] = *(zod+i);
+      Zoa_c[i] = *(zoa+i);
+      Aod_c[i] = *(aoa+i);
+      Aoa_c[i] = *(aod+i);
+
+  }
+
+  std::ofstream f;
+  f.open ("ray_tracing.txt",  std::ios::app);
+  f<<"path_number" <<'\t'<< n_cluster  << std::endl;
+ uint16_t link_state = cond_model->GetChannelCondition(txMob,rxMob)->GetLosCondition();
+ if (link_state == 0)
+	link_state = 2; 
+  f<<"link_state" <<'\t'<< link_state << std::endl;
+ // std::cout<<cond_model->GetChannelCondition(txMob,rxMob)->GetLosCondition();
+  f<< "TX"<<'\t'<<txMob->GetPosition().x << '\t' << txMob->GetPosition().y << '\t'<< txMob->GetPosition().z<< std::endl;
+
+  f<< "RX" <<'\t'<<rxMob->GetPosition().x << '\t' << rxMob->GetPosition().y << '\t'<< rxMob->GetPosition().z<< std::endl;
+  
+  /*write_file(delay, &f, false, n_cluster, n_rays, "delay");
+  write_file(Pathloss_gain, &f, false, n_cluster, n_rays, "pathloss");
+  write_file(zod, &f, true, n_cluster, n_rays, "zod");
+  write_file(zoa, &f, true, n_cluster, n_rays, "zoa");
+  write_file(aod, &f, true, n_cluster, n_rays, "aod");
+  write_file(aoa, &f, true, n_cluster, n_rays, "aoa");*/
+
+   write_file_cluster_only(delay, &f, n_cluster,  "delay");
+  write_file_cluster_only(Pathloss_gain, &f,  n_cluster, "pathloss");
+  write_file_cluster_only(Zod_c, &f, n_cluster,  "zod");
+  write_file_cluster_only(Zoa_c, &f, n_cluster,  "zoa");
+  write_file_cluster_only(Aod_c, &f,  n_cluster, "aod");
+  write_file_cluster_only(Aoa_c, &f, n_cluster,  "aoa");
+
+//  NS_LOG_INFO ("sample data"<<"\t" <<Simulator::Now().GetSeconds()<<'\t'<< Delay[0] <<'\t'<< Pathloss_gain[0]<<"\t"<<Aoa[0][0]<<"\t"<<Aod[0][0]<<"\t"<<Zoa[0][0]<<"\t"<<Zod[0][0]);
+}
+
+void SetPosition(Ptr<MobilityModel> txMob, Ptr<MobilityModel> rxMob, std::vector<Vector> tx_loc, std::vector<Vector> rx_loc, uint16_t i){
+  
+  txMob->SetPosition (Vector (tx_loc[i].x,tx_loc[i].y,tx_loc[i].z));
+  rxMob->SetPosition (Vector (rx_loc[i].x,rx_loc[i].y,rx_loc[i].z));
+ // std::cout << i << std::endl;
+  Simulator::Schedule (MilliSeconds (1000), &SetPosition, txMob, rxMob, tx_loc, rx_loc, i+1);
+}
+
 int
 main (int argc, char *argv[])
 {
+  std::string line;
+
+  std::vector<Vector> tx_loc, rx_loc;
+
+  std::ifstream f;
+  f.open("location.txt");
+
+  while (std::getline(f, line)){
+     
+      std::istringstream iss(line);
+      std::string ind, x, y,z;
+      std::getline(iss, ind, '\t' );
+      std::getline(iss, x, '\t' );
+      std::getline(iss, y, '\t' );
+      std::getline(iss, z, '\t' );
+    
+      if (ind == "tx")
+        tx_loc.push_back(Vector(stod(x), stod(y), stod(z)));
+      else
+        rx_loc.push_back(Vector(stod(x), stod(y), stod(z)));
+
+  }
+  f.close();
+  //NS_LOG_UNCOND("sizeeee " <<tx_loc.size()) ;
   double frequency = 28.0e9; // operating frequency in Hz (corresponds to EARFCN 2100)
   double txPow = 23.0; // tx power in dBm
   double noiseFigure = 6.0; // noise figure in dB
-  double distance = 10.0; // distance between tx and rx nodes in meters
-  uint32_t simTime = 10000; // simulation time in milliseconds
+ // double distance = 10.0; // distance between tx and rx nodes in meters
+  uint32_t simTime = 1000*tx_loc.size(); // simulation time in milliseconds
+  std::cout <<"simulation time (milliseconds): " << simTime << std::endl; 
   uint32_t timeRes = 10; // time resolution in milliseconds
   std::string scenario = "UMa"; // 3GPP propagation scenario
 
-  Config::SetDefault ("ns3::ThreeGppChannelModel::UpdatePeriod", TimeValue(MilliSeconds (1))); // update the channel at each iteration
-  Config::SetDefault ("ns3::ThreeGppChannelConditionModel::UpdatePeriod", TimeValue(MilliSeconds (0.0))); // do not update the channel condition
+  Config::SetDefault ("ns3::ThreeGppChannelModel::UpdatePeriod", TimeValue(MilliSeconds (1000))); // update the channel at each iteration
+  Config::SetDefault ("ns3::ThreeGppChannelConditionModel::UpdatePeriod", TimeValue(MilliSeconds (1000.0))); // do not update the channel condition
 
   RngSeedManager::SetSeed(1);
   RngSeedManager::SetRun(1);
@@ -206,12 +339,19 @@ main (int argc, char *argv[])
   Ptr<ChannelConditionModel> condModel = channelConditionModelFactory.Create<ThreeGppChannelConditionModel> ();
   m_spectrumLossModel->SetChannelModelAttribute ("ChannelConditionModel", PointerValue (condModel));
   m_propagationLossModel->SetChannelConditionModel (condModel);
+  //Ptr<MmWaveHelper> mmwaveHelper = CreateObject<MmWaveHelper> ();
 
   // create the tx and rx nodes
   NodeContainer nodes;
   nodes.Create (2);
 
   // create the tx and rx devices
+ // NetDeviceContainer enbMmWaveDevs = mmwaveHelper->InstallEnbDevice (nodes.Get(0));
+ // NetDeviceContainer ueMmWaveDevs = mmwaveHelper->InstallUeDevice (nodes.Get(1));
+  //enbNetDev = enbMmWaveDevs.Get (0);
+  //ueNetDev = ueMmWaveDevs.Get (0);
+  
+
   Ptr<SimpleNetDevice> txDev = CreateObject<SimpleNetDevice> ();
   Ptr<SimpleNetDevice> rxDev = CreateObject<SimpleNetDevice> ();
 
@@ -223,9 +363,10 @@ main (int argc, char *argv[])
 
   // create the tx and rx mobility models, set the positions
   Ptr<MobilityModel> txMob = CreateObject<ConstantPositionMobilityModel> ();
-  txMob->SetPosition (Vector (0.0,0.0,100.0));
+  txMob->SetPosition (Vector (20.0,0.0,20.0));
   Ptr<MobilityModel> rxMob = CreateObject<ConstantPositionMobilityModel> ();
-  rxMob->SetPosition (Vector (distance,0.0,1.6));
+  rxMob->SetPosition (Vector (0,0.0,1.6));
+
 
   // assign the mobility models to the nodes
   nodes.Get (0)->AggregateObject (txMob);
@@ -235,20 +376,34 @@ main (int argc, char *argv[])
   Ptr<ThreeGppAntennaArrayModel> txAntenna = CreateObjectWithAttributes<ThreeGppAntennaArrayModel> ("NumColumns", UintegerValue (2), "NumRows", UintegerValue (2));
   Ptr<ThreeGppAntennaArrayModel> rxAntenna = CreateObjectWithAttributes<ThreeGppAntennaArrayModel> ("NumColumns", UintegerValue (2), "NumRows", UintegerValue (2));
 
+  // Ptr<MmWaveEnbNetDevice> enbNetDevice = StaticCast<MmWaveEnbNetDevice> (enbMmWaveDevs.Get (0));
+   //Ptr<ThreeGppAntennaArrayModel> enbAntenna = enbNetDevice->GetPhy ()->GetDlSpectrumPhy ()->GetBeamformingModel ()->GetAntenna ();
+   //enbAntenna->SetAttribute ("IsotropicElements", BooleanValue (true));
+
+  //Ptr<MmWaveEnbNetDevice> enbNetDevice = StaticCast<MmWaveEnbNetDevice> (enbMmWaveDevs.Get (0));
+  //Ptr<ThreeGppAntennaArrayModel> ueAntenna = ueNetDevice->GetPhy ()->GetDlSpectrumPhy ()->GetBeamformingModel ()->GetAntenna ();
+   //ueAntenna->SetAttribute ("IsotropicElements", BooleanValue (true));
+
   // initialize the devices in the ThreeGppSpectrumPropagationLossModel
   m_spectrumLossModel->AddDevice (txDev, txAntenna);
   m_spectrumLossModel->AddDevice (rxDev, rxAntenna);
-
+  auto m_channel =  m_spectrumLossModel->GetChannelModel();
+  //std::cout << m_channel->GetChannel(txMob, rxMob,txAntenna, rxAntenna); 
+  Ptr<MobilityModel> Mob_pair[2];
+  Mob_pair [0] = txMob;
+  Mob_pair [1] = rxMob;
+   m_channel->TraceConnectWithoutContext ("RayTracing",MakeBoundCallback (&RayTracing, Mob_pair));
   // set the beamforming vectors
   DoBeamforming (txDev, txAntenna, rxDev);
   DoBeamforming (rxDev, rxAntenna, txDev);
-NS_LOG_UNCOND('ddd')
+  Simulator::Schedule (MilliSeconds (0), &SetPosition,  txMob, rxMob, tx_loc, rx_loc,0);
+  
   for (int i = 0; i < floor (simTime / timeRes); i++)
   {
-    NS_LOG_UNCOND('ddd')
+    
     Simulator::Schedule (MilliSeconds (timeRes*i), &ComputeSnr, txMob, rxMob, txPow, noiseFigure);
   }
-
+  Simulator::Stop (MilliSeconds (simTime));
   Simulator::Run ();
   Simulator::Destroy ();
   return 0;

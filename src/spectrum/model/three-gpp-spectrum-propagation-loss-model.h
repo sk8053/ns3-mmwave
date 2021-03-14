@@ -27,7 +27,7 @@
 #include <map>
 #include <unordered_map>
 #include "ns3/matrix-based-channel-model.h"
-
+#include "ns3/traced-callback.h"
 namespace ns3 {
 
 class NetDevice;
@@ -190,6 +190,7 @@ private:
   std::unordered_map <uint32_t, Ptr<const ThreeGppAntennaArrayModel> > m_deviceAntennaMap; //!< map containig the <node, antenna> associations
   mutable std::unordered_map < uint32_t, Ptr<const LongTerm> > m_longTermMap; //!< map containing the long term components
   Ptr<MatrixBasedChannelModel> m_channelModel; //!< the model to generate the channel matrix
+  
 };
 } // namespace ns3
 

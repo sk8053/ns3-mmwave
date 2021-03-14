@@ -261,6 +261,7 @@ ThreeGppSpectrumPropagationLossModel::GetLongTerm (uint32_t aId, uint32_t bId,
       Ptr<LongTerm> longTermItem = Create<LongTerm> ();
       longTermItem->m_longTerm = longTerm;
       longTermItem->m_channel = channelMatrix;
+      
       longTermItem->m_sW = sW;
       longTermItem->m_uW = uW;
 

@@ -813,7 +813,7 @@ ThreeGppUmiStreetCanyonPropagationLossModel::GetLossNlos (double distance2D, dou
   // compute the pathloss
   double plNlos = 22.4 + 35.3 * log10 (distance3D) + 21.3 * log10 (m_frequency / 1e9) - 0.3 * (hUt - 1.5);
   double loss = std::max (GetLossLos (distance2D, distance3D, hUt, hBs), plNlos);
-  NS_LOG_DEBUG ("Loss " << loss);
+  NS_LOG_UNCOND ("Loss " << loss);
 
   return loss;
 }
