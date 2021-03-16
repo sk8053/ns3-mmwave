@@ -41,3 +41,4 @@ build/
 /.cproject
 /.project
 .vscode/settings.json
+.idea
