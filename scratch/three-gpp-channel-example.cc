@@ -106,6 +106,7 @@ DoBeamforming (Ptr<NetDevice> thisDevice, Ptr<ThreeGppAntennaArrayModel> thisAnt
  * \param txPow the transmitting power in dBm
  * \param noiseFigure the noise figure in dB
  */
+/*
 static void
 ComputeSnr (Ptr<MobilityModel> txMob, Ptr<MobilityModel> rxMob, double txPow, double noiseFigure)
 {
@@ -119,32 +120,32 @@ ComputeSnr (Ptr<MobilityModel> txMob, Ptr<MobilityModel> rxMob, double txPow, do
   }
   Ptr<SpectrumValue> txPsd = LteSpectrumValueHelper::CreateTxPowerSpectralDensity (2100, 100, txPow, activeRbs0);
   Ptr<SpectrumValue> rxPsd = txPsd->Copy ();
-  NS_LOG_DEBUG ("Average tx power " << 10*log10(Sum (*txPsd) * 180e3) << " dB");
+  //NS_LOG_DEBUG ("Average tx power " << 10*log10(Sum (*txPsd) * 180e3) << " dB");
 
   // create the noise PSD
-  Ptr<SpectrumValue> noisePsd = LteSpectrumValueHelper::CreateNoisePowerSpectralDensity (2100, 100, noiseFigure);
-  NS_LOG_DEBUG ("Average noise power " << 10*log10 (Sum (*noisePsd) * 180e3) << " dB");
+ // Ptr<SpectrumValue> noisePsd = LteSpectrumValueHelper::CreateNoisePowerSpectralDensity (2100, 100, noiseFigure);
+  //NS_LOG_DEBUG ("Average noise power " << 10*log10 (Sum (*noisePsd) * 180e3) << " dB");
 
   // apply the pathloss
   double propagationGainDb = m_propagationLossModel->CalcRxPower (0, txMob, rxMob);
-  NS_LOG_DEBUG ("Pathloss " << -propagationGainDb << " dB");
+ // NS_LOG_DEBUG ("Pathloss " << -propagationGainDb << " dB");
   double propagationGainLinear = std::pow (10.0, (propagationGainDb) / 10.0);
-  *(rxPsd) *= propagationGainLinear;
+ *(rxPsd) *= propagationGainLinear;
 
-  NS_LOG_DEBUG (10*log10((*(rxPsd))[0]*180e3));
+  //NS_LOG_DEBUG (10*log10((*(rxPsd))[0]*180e3));
   // apply the fast fading and the beamforming gain
   rxPsd = m_spectrumLossModel->CalcRxPowerSpectralDensity (rxPsd, txMob, rxMob);
-  NS_LOG_DEBUG ("Average rx power " << 10*log10 (Sum (*rxPsd) * 180e3) << " dB");
+  //NS_LOG_DEBUG ("Average rx power " << 10*log10 (Sum (*rxPsd) * 180e3) << " dB");
 
   // compute the SNR
-  NS_LOG_DEBUG ("Average SNR " << 10 * log10 (Sum (*rxPsd) / Sum (*noisePsd)) << " dB");
+  //NS_LOG_DEBUG ("Average SNR " << 10 * log10 (Sum (*rxPsd) / Sum (*noisePsd)) << " dB");
 
   // print the SNR and pathloss values in the snr-trace.txt file
-  std::ofstream f;
-  f.open ("snr-trace.txt", std::ios::out | std::ios::app);
-  f << Simulator::Now ().GetSeconds () << " " << 10 * log10 (Sum (*rxPsd) / Sum (*noisePsd)) << " " << propagationGainDb << std::endl;
-  f.close ();
-}
+ //std::ofstream f;
+ // f.open ("snr-trace.txt", std::ios::out | std::ios::app);
+ // f << Simulator::Now ().GetSeconds () << " " << 10 * log10 (Sum (*rxPsd) / Sum (*noisePsd)) << " " << propagationGainDb << std::endl;
+ // f.close ();
+}*/
 
 static void write_file_cluster_only(double *data, std::ofstream *f,  int n_cluster, std::string name){
   //std::ofstream f;
@@ -216,8 +217,9 @@ static void RayTracing ( Ptr<MobilityModel> * MobPair, double* delay, double * p
   f.open ("ray_tracing.txt",  std::ios::app);
   f<<"path_number" <<'\t'<< n_cluster  << std::endl;
  uint16_t link_state = cond_model->GetChannelCondition(txMob,rxMob)->GetLosCondition();
- if (link_state == 1)
-	link_state = 2; 
+//if (link_state == 1)
+//	link_state = 2; 
+link_state++;
   f<<"link_state" <<'\t'<< link_state << std::endl;
   //std::cout<<cond_model->GetChannelCondition(txMob,rxMob)->GetLosCondition();
   f<< "TX"<<'\t'<<txMob->GetPosition().x << '\t' << txMob->GetPosition().y << '\t'<< txMob->GetPosition().z<< std::endl;
@@ -245,13 +247,41 @@ void SetPosition(Ptr<MobilityModel> txMob, Ptr<MobilityModel> rxMob, std::vector
   
   txMob->SetPosition (Vector (tx_loc[i].x,tx_loc[i].y,tx_loc[i].z));
   rxMob->SetPosition (Vector (rx_loc[i].x,rx_loc[i].y,rx_loc[i].z));
+
+  double txPow = 65.0; // tx power in dBm
+  double noiseFigure = 6.0; // noise figure in dB
+
+  std::vector<int> activeRbs0 (100);
+  for (int i = 0; i < 100 ; i++)
+  {
+    activeRbs0[i] = i;
+  }
+  Ptr<SpectrumValue> txPsd = LteSpectrumValueHelper::CreateTxPowerSpectralDensity (2100, 100, txPow, activeRbs0);
+  Ptr<SpectrumValue> rxPsd = txPsd->Copy ();
+
+  // create the noise PSD
+  Ptr<SpectrumValue> noisePsd = LteSpectrumValueHelper::CreateNoisePowerSpectralDensity (2100, 100, noiseFigure);
+
+  // apply the pathloss
+  double propagationGainDb = m_propagationLossModel->CalcRxPower (0, txMob, rxMob);
+  double propagationGainLinear = std::pow (10.0, (propagationGainDb) / 10.0);
+  *(rxPsd) *= propagationGainLinear;
+  rxPsd = m_spectrumLossModel->CalcRxPowerSpectralDensity (rxPsd, txMob, rxMob);
+
+  
  // std::cout << i << std::endl;
-  Simulator::Schedule (MilliSeconds (1000), &SetPosition, txMob, rxMob, tx_loc, rx_loc, i+1);
+  Simulator::Schedule (MilliSeconds (2), &SetPosition, txMob, rxMob, tx_loc, rx_loc, i+1);
 }
 
 int
 main (int argc, char *argv[])
 {
+ double frequency= 28.0e9;
+
+ CommandLine cmd;
+ cmd.AddValue("frequency", "carrier frequency", frequency);
+ cmd.Parse(argc, argv);
+ std::cout<< frequency<<std::endl; 
   std::string line;
 
   std::vector<Vector> tx_loc, rx_loc;
@@ -275,18 +305,16 @@ main (int argc, char *argv[])
 
   }
   f.close();
-  //NS_LOG_UNCOND("sizeeee " <<tx_loc.size()) ;
-  double frequency = 28.0e9; // operating frequency in Hz (corresponds to EARFCN 2100)
-  double txPow = 23.0; // tx power in dBm
-  double noiseFigure = 6.0; // noise figure in dB
- // double distance = 10.0; // distance between tx and rx nodes in meters
-  uint32_t simTime = 1000*tx_loc.size(); // simulation time in milliseconds
+  //double txPow = 65.0; // tx power in dBm
+ // double noiseFigure = 6.0; // noise figure in dB
+  uint16_t u_time = 1; //update time
+  uint32_t simTime =u_time *tx_loc.size()*2; // simulation time in milliseconds
   std::cout <<"simulation time (milliseconds): " << simTime << std::endl; 
-  uint32_t timeRes = 10; // time resolution in milliseconds
-  std::string scenario = "UMa"; // 3GPP propagation scenario
+ // uint32_t timeRes = 1.5; // time resolution in milliseconds
+  std::string scenario = "UMi-StreetCanyon"; // 3GPP propagation scenario
 
-  Config::SetDefault ("ns3::ThreeGppChannelModel::UpdatePeriod", TimeValue(MilliSeconds (1000))); // update the channel at each iteration
-  Config::SetDefault ("ns3::ThreeGppChannelConditionModel::UpdatePeriod", TimeValue(MilliSeconds (10.0))); // do not update the channel condition
+  Config::SetDefault ("ns3::ThreeGppChannelModel::UpdatePeriod", TimeValue(MilliSeconds (u_time))); // update the channel at each iteration
+  Config::SetDefault ("ns3::ThreeGppChannelConditionModel::UpdatePeriod", TimeValue(MilliSeconds (u_time))); // do not update the channel condition
 
   RngSeedManager::SetSeed(1);
   RngSeedManager::SetRun(1);
@@ -398,11 +426,11 @@ main (int argc, char *argv[])
   DoBeamforming (rxDev, rxAntenna, txDev);
   Simulator::Schedule (MilliSeconds (0), &SetPosition,  txMob, rxMob, tx_loc, rx_loc,0);
   
-  for (int i = 0; i < floor (simTime / timeRes); i++)
-  {
+  //for (int i = 0; i < floor (simTime / timeRes); i++)
+ // {
     
-    Simulator::Schedule (MilliSeconds (timeRes*i), &ComputeSnr, txMob, rxMob, txPow, noiseFigure);
-  }
+    //Simulator::Schedule (MilliSeconds (timeRes*i), &ComputeSnr, txMob, rxMob, txPow, noiseFigure);
+ // }
   Simulator::Stop (MilliSeconds (simTime));
   Simulator::Run ();
   Simulator::Destroy ();
