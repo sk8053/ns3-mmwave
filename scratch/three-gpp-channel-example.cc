@@ -216,10 +216,10 @@ static void RayTracing ( Ptr<MobilityModel> * MobPair, double* delay, double * p
   f.open ("ray_tracing.txt",  std::ios::app);
   f<<"path_number" <<'\t'<< n_cluster  << std::endl;
  uint16_t link_state = cond_model->GetChannelCondition(txMob,rxMob)->GetLosCondition();
- if (link_state == 0)
+ if (link_state == 1)
 	link_state = 2; 
   f<<"link_state" <<'\t'<< link_state << std::endl;
- // std::cout<<cond_model->GetChannelCondition(txMob,rxMob)->GetLosCondition();
+  //std::cout<<cond_model->GetChannelCondition(txMob,rxMob)->GetLosCondition();
   f<< "TX"<<'\t'<<txMob->GetPosition().x << '\t' << txMob->GetPosition().y << '\t'<< txMob->GetPosition().z<< std::endl;
 
   f<< "RX" <<'\t'<<rxMob->GetPosition().x << '\t' << rxMob->GetPosition().y << '\t'<< rxMob->GetPosition().z<< std::endl;
@@ -286,7 +286,7 @@ main (int argc, char *argv[])
   std::string scenario = "UMa"; // 3GPP propagation scenario
 
   Config::SetDefault ("ns3::ThreeGppChannelModel::UpdatePeriod", TimeValue(MilliSeconds (1000))); // update the channel at each iteration
-  Config::SetDefault ("ns3::ThreeGppChannelConditionModel::UpdatePeriod", TimeValue(MilliSeconds (1000.0))); // do not update the channel condition
+  Config::SetDefault ("ns3::ThreeGppChannelConditionModel::UpdatePeriod", TimeValue(MilliSeconds (10.0))); // do not update the channel condition
 
   RngSeedManager::SetSeed(1);
   RngSeedManager::SetRun(1);
