@@ -104,7 +104,7 @@ void
 ThreeGppPropagationLossModel::SetFrequency (double f)
 {
   NS_LOG_FUNCTION (this);
-  NS_ASSERT_MSG (f >= 500.0e6 && f <= 100.0e9, "Frequency should be between 0.5 and 100 GHz but is " << f);
+ //NS_ASSERT_MSG (f >= 500.0e6 && f <= 100.0e9, "Frequency should be between 0.5 and 100 GHz but is " << f);
   m_frequency = f;
 }
 
@@ -813,7 +813,7 @@ ThreeGppUmiStreetCanyonPropagationLossModel::GetLossNlos (double distance2D, dou
   // compute the pathloss
   double plNlos = 22.4 + 35.3 * log10 (distance3D) + 21.3 * log10 (m_frequency / 1e9) - 0.3 * (hUt - 1.5);
   double loss = std::max (GetLossLos (distance2D, distance3D, hUt, hBs), plNlos);
-  NS_LOG_UNCOND ("Loss " << loss);
+  //NS_LOG_UNCOND ("Loss " << loss);
 
   return loss;
 }
@@ -893,7 +893,245 @@ ThreeGppUmiStreetCanyonPropagationLossModel::GetShadowingCorrelationDistance (Ch
 
   return correlationDistance;
 }
+// UMi-Street Canon Model, 3GPP 36.777, Table B-2
+// added by SJ Kang
+// ------------------------------------------------------------------------- //
 
+NS_OBJECT_ENSURE_REGISTERED (ThreeGppAerialUmiStreetCanyonPropagationLossModel);
+
+TypeId
+ThreeGppAerialUmiStreetCanyonPropagationLossModel::GetTypeId (void)
+{
+  static TypeId tid = TypeId ("ns3::ThreeGppAerialUmiStreetCanyonPropagationLossModel")
+    .SetParent<ThreeGppPropagationLossModel> ()
+    .SetGroupName ("Propagation")
+    .AddConstructor<ThreeGppAerialUmiStreetCanyonPropagationLossModel> ()
+  ;
+  return tid;
+}
+ThreeGppAerialUmiStreetCanyonPropagationLossModel::ThreeGppAerialUmiStreetCanyonPropagationLossModel ()
+  : ThreeGppPropagationLossModel ()
+{
+  NS_LOG_FUNCTION (this);
+
+  // set a default channel condition model
+  m_channelConditionModel = CreateObject<ThreeGppAerialUmiStreetCanyonChannelConditionModel> ();
+}
+
+ThreeGppAerialUmiStreetCanyonPropagationLossModel::~ThreeGppAerialUmiStreetCanyonPropagationLossModel ()
+{
+  NS_LOG_FUNCTION (this);
+}
+
+double
+ThreeGppAerialUmiStreetCanyonPropagationLossModel::GetBpDistance (double hUt, double hBs, double distance2D) const
+{
+  NS_LOG_FUNCTION (this);
+  NS_UNUSED (distance2D);
+
+  // compute hE (see 3GPP TR 38.901, Table 7.4.1-1, Note 1)
+  double hE = 1.0;
+
+  // compute dBP' (see 3GPP TR 38.901, Table 7.4.1-1, Note 1)
+  double distanceBp = 4 * (hBs - hE) * (hUt - hE) * m_frequency / M_C;
+
+  return distanceBp;
+}
+
+double
+ThreeGppAerialUmiStreetCanyonPropagationLossModel::GetLossLos (double distance2D, double distance3D, double hUt, double hBs) const
+{
+  NS_LOG_FUNCTION (this);
+
+  // check if hBS and hUT are within the validity range
+  if (hUt < 1.5 || hUt >= 300.0)
+    {
+      NS_LOG_WARN ("The height of the UT should be between 1.5 and 300 m (see TR 36.777, Table B-2). We further assume hUT < hBS, then hUT is upper bounded by hBS, which should be 10 m");
+    }
+
+  if (hBs != 10.0)
+    {
+      NS_LOG_WARN ("The height of the BS should be equal to 10 m (see TR 38.901, Table 7.4.1-1)");
+    }
+
+  // NOTE The model is intended to be used for BS-UT links, however we may need to
+  // compute the pathloss between two BSs or UTs, e.g., to evaluate the
+  // interference. In order to apply the model, we need to retrieve the values of
+  // hBS and hUT, but in these cases one of the two falls outside the validity
+  // range and the warning message is printed (hBS for the UT-UT case and hUT
+  // for the BS-BS case).
+
+  // compute the breakpoint distance (see 3GPP TR 38.901, Table 7.4.1-1, note 1)
+  double distanceBp = GetBpDistance (hUt, hBs, distance2D);
+  NS_LOG_DEBUG ("breakpoint distance " << distanceBp);
+
+  // check if the distace is outside the validity range
+  if (distance2D < 10.0 || distance2D > 5.0e3)
+    {
+      NS_LOG_WARN ("The 2D distance is outside the validity range, the pathloss value may not be accurate");
+    }
+
+  // compute the pathloss (see 3GPP TR 38.901, Table 7.4.1-1)
+  double loss = 0;
+  if (hUt >=1.5 && hUt < 22.5){
+	  if (distance2D <= distanceBp)
+		{
+		  // use PL1
+		  loss = 32.4 + 21.0 * log10 (distance3D) + 20.0 * log10 (m_frequency / 1e9);
+		}
+	  else
+		{
+		  // use PL2
+		  loss = 32.4 + 40.0 * log10 (distance3D) + 20.0 * log10 (m_frequency / 1e9) - 9.5 * log10 (pow (distanceBp, 2) + pow (hBs - hUt, 2));
+		}
+
+	  NS_LOG_DEBUG ("Loss " << loss);
+	  }
+  // compute the pathloss (see 3GPP TR 36.777, Table B-2)
+  else{
+	  double pl_f = 20* log10(distance3D) + 20* log10(m_frequency) - 147.55; // free space path loss
+	  double pl2 = 30.9 + (22.25 - 0.5* log10(hUt))* log10(distance3D) + 20* log10(m_frequency/1e9);
+	  loss = std::max(pl_f, pl2);
+  }
+  return loss;
+}
+
+double
+ThreeGppAerialUmiStreetCanyonPropagationLossModel::GetLossNlos (double distance2D, double distance3D, double hUt, double hBs) const
+{
+  NS_LOG_FUNCTION (this);
+
+  // check if hBS and hUT are within the validity range
+  if (hUt < 1.5 || hUt >= 300.0)
+    {
+      NS_LOG_WARN ("The height of the UT should be between 1.5 and 300 m (see TR 36.777, Table B-2). We further assume hUT < hBS, then hUT is upper bounded by hBS, which should be 10 m");
+    }
+
+  if (hBs != 10.0)
+    {
+      NS_LOG_WARN ("The height of the BS should be equal to 10 m (see TR 38.901, Table 7.4.1-1)");
+    }
+
+  // NOTE The model is intended to be used for BS-UT links, however we may need to
+  // compute the pathloss between two BSs or UTs, e.g., to evaluate the
+  // interference. In order to apply the model, we need to retrieve the values of
+  // hBS and hUT, but in these cases one of the two falls outside the validity
+  // range and the warning message is printed (hBS for the UT-UT case and hUT
+  // for the BS-BS case).
+
+  // check if the distace is outside the validity range
+  if (distance2D < 10.0 || distance2D > 5.0e3)
+    {
+      NS_LOG_WARN ("The 2D distance is outside the validity range, the pathloss value may not be accurate");
+    }
+  double loss = 0;
+  if (hUt >=1.5 && hUt<= 22.5)
+  {
+  // compute the pathloss
+  double plNlos = 22.4 + 35.3 * log10 (distance3D) + 21.3 * log10 (m_frequency / 1e9) - 0.3 * (hUt - 1.5);
+  loss = std::max (GetLossLos (distance2D, distance3D, hUt, hBs), plNlos);
+  //NS_LOG_UNCOND ("Loss " << loss);
+  }
+  else{
+  // compute los loss fist for UMi-AV according to 3GPP 36.777 table B-2
+    double pl_f = 20*std::log10(distance3D) + 20*std::log10(m_frequency) - 147.55;
+    double pl2 = 30.9 + (22.25 - 0.5*std::log10(hUt))*std::log10(distance3D) + 20*std::log10(m_frequency/1e9);
+     // double los_loss = GetLossLos (distance2D, distance3D, hUt, hBs);//std::max(pl_f, pl2);
+    double los_loss = std::max(pl_f, pl2);
+   // compute nlos loss fist for UMi-AV according to 3GPP 36.777 table B-2
+   double nlos_loss = 32.4 + (43.2 - 7.6*log10(hUt))*log10(distance3D) + 20*log10(m_frequency/1e9);
+   loss = std::max(los_loss, nlos_loss);
+   //std::cout <<distance3D<<'\t'<<hUt<<'\t'<<hBs<<'\t'<< los_loss<<'\t'<< nlos_loss << std::endl;
+  }
+  return loss;
+}
+
+std::pair<double, double>
+ThreeGppAerialUmiStreetCanyonPropagationLossModel::GetUtAndBsHeights (double za, double zb) const
+{
+  NS_LOG_FUNCTION (this);
+  // TR 38.901 specifies hBS = 10 m and 1.5 <= hUT <= 22.5
+  double hBs, hUt;
+  if (za == 10.0)
+    {
+      // node A is the BS and node B is the UT
+      hBs = za;
+      hUt = zb;
+    }
+  else if (zb == 10.0)
+    {
+      // node B is the BS and node A is the UT
+      hBs = zb;
+      hUt = za;
+    }
+  else
+    {
+      // We cannot know who is the BS and who is the UT, we assume that the
+      // tallest node is the BS and the smallest is the UT
+      hBs = std::max (za, zb);
+      hUt = std::min (za, za);
+    }
+
+  return std::pair<double, double> (hUt, hBs);
+}
+
+double
+ThreeGppAerialUmiStreetCanyonPropagationLossModel::GetShadowingStd (Ptr<MobilityModel> a, Ptr<MobilityModel> b, ChannelCondition::LosConditionValue cond) const
+{
+  // shadowing standard deviation is modified by 3GPP 36.777 table B-3 for aerial UEs
+  // modified by SJ Kang
+  NS_LOG_FUNCTION (this);
+  NS_UNUSED (a);
+  NS_UNUSED (b);
+  double shadowingStd;
+  double hUt = std::max(a->GetPosition().z, b->GetPosition().z);
+  if (cond == ChannelCondition::LosConditionValue::LOS)
+    {
+      if (hUt>=1.5 && hUt<22.5)
+    	  shadowingStd = 4.0;
+      else{
+    	  double s1 = 5*std::exp(-0.01*hUt);
+    	  double s2 = 2;
+    	  shadowingStd = std::max(s1, s2);
+      	  }
+    }
+  else if (cond == ChannelCondition::LosConditionValue::NLOS)
+    {
+	  if (hUt>=1.5 && hUt<22.5)
+		  shadowingStd = 7.82;
+	  else
+		  shadowingStd = 8.0;
+    }
+  else
+    {
+      NS_FATAL_ERROR ("Unknown channel condition");
+    }
+
+  return shadowingStd;
+}
+
+double
+ThreeGppAerialUmiStreetCanyonPropagationLossModel::GetShadowingCorrelationDistance (ChannelCondition::LosConditionValue cond) const
+{
+  NS_LOG_FUNCTION (this);
+  double correlationDistance;
+
+  // See 3GPP TR 38.901, Table 7.5-6
+  if (cond == ChannelCondition::LosConditionValue::LOS)
+    {
+      correlationDistance = 10;
+    }
+  else if (cond == ChannelCondition::LosConditionValue::NLOS)
+    {
+      correlationDistance = 13;
+    }
+  else
+    {
+      NS_FATAL_ERROR ("Unknown channel condition");
+    }
+
+  return correlationDistance;
+}
 // ------------------------------------------------------------------------- //
 
 NS_OBJECT_ENSURE_REGISTERED (ThreeGppIndoorOfficePropagationLossModel);

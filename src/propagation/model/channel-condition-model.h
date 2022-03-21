@@ -489,6 +489,39 @@ private:
   virtual double ComputePlos (Ptr<const MobilityModel> a, Ptr<const MobilityModel> b) const override;
 };
 
+// added by SJ Kang accoridng to 3GPP 36.777, table B-1 LoS Probability
+class ThreeGppAerialUmiStreetCanyonChannelConditionModel : public ThreeGppChannelConditionModel
+{
+public:
+  /**
+   * Get the type ID.
+   * \brief Get the type ID.
+   * \return the object TypeId
+   */
+  static TypeId GetTypeId (void);
+
+  /**
+   * Constructor for the ThreeGppUmiStreetCanyonChannelConditionModel class
+   */
+  ThreeGppAerialUmiStreetCanyonChannelConditionModel ();
+
+  /**
+   * Destructor for the ThreeGppUmiStreetCanyonChannelConditionModel class
+   */
+  virtual ~ThreeGppAerialUmiStreetCanyonChannelConditionModel () override;
+
+private:
+  /**
+   * Compute the LOS probability as specified in Table B-l in 3GPP 36.777
+   * for the UMi-Street Canyon scenario.
+   *
+   * \param a tx mobility model
+   * \param b rx mobility model
+   * \return the LOS probability
+   */
+  virtual double ComputePlos (Ptr<const MobilityModel> a, Ptr<const MobilityModel> b) const override;
+};
+
 /**
  * \ingroup propagation
  *

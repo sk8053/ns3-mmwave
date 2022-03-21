@@ -24,7 +24,7 @@
 #include <cmath>
 #include "ns3/node.h"
 #include "ns3/simulator.h"
-
+#include <algorithm>
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("ChannelConditionModel");
@@ -243,8 +243,10 @@ ThreeGppChannelConditionModel::GetChannelCondition (Ptr<const MobilityModel> a,
       double pLos = ComputePlos (a, b);
 
       // draw a random value
+      int r = rand()%3000+1;
+      m_uniformVar->SetStream(r);
       double pRef = m_uniformVar->GetValue ();
-
+      //std::cout<<pRef<<std::endl;
       // get the channel condition
       cond = CreateObject<ChannelCondition> ();
       if (pRef <= pLos)
@@ -325,7 +327,7 @@ ThreeGppRmaChannelConditionModel::ThreeGppRmaChannelConditionModel ()
 ThreeGppRmaChannelConditionModel::~ThreeGppRmaChannelConditionModel ()
 {
 }
-
+// RMA channel
 double
 ThreeGppRmaChannelConditionModel::ComputePlos (Ptr<const MobilityModel> a,
                                                Ptr<const MobilityModel> b) const
@@ -373,7 +375,7 @@ ThreeGppUmaChannelConditionModel::ThreeGppUmaChannelConditionModel ()
 ThreeGppUmaChannelConditionModel::~ThreeGppUmaChannelConditionModel ()
 {
 }
-
+//UMA channel
 double
 ThreeGppUmaChannelConditionModel::ComputePlos (Ptr<const MobilityModel> a,
                                                Ptr<const MobilityModel> b) const
@@ -443,7 +445,7 @@ ThreeGppUmiStreetCanyonChannelConditionModel::ThreeGppUmiStreetCanyonChannelCond
 ThreeGppUmiStreetCanyonChannelConditionModel::~ThreeGppUmiStreetCanyonChannelConditionModel ()
 {
 }
-
+//UMi-Street Cannon
 double
 ThreeGppUmiStreetCanyonChannelConditionModel::ComputePlos (Ptr<const MobilityModel> a,
                                                            Ptr<const MobilityModel> b) const
@@ -471,6 +473,86 @@ ThreeGppUmiStreetCanyonChannelConditionModel::ComputePlos (Ptr<const MobilityMod
     {
       pLos = 18.0 / distance2D + exp (-distance2D / 36.0) * (1.0 - 18.0 / distance2D);
     }
+
+  return pLos;
+}
+// ------------------------------------------------------------------------- //
+//added by SJ Kang
+NS_OBJECT_ENSURE_REGISTERED (ThreeGppAerialUmiStreetCanyonChannelConditionModel);
+
+TypeId
+ThreeGppAerialUmiStreetCanyonChannelConditionModel::GetTypeId (void)
+{
+  static TypeId tid = TypeId ("ns3::ThreeGppAerialUmiStreetCanyonChannelConditionModel")
+    .SetParent<ThreeGppChannelConditionModel> ()
+    .SetGroupName ("Propagation")
+    .AddConstructor<ThreeGppAerialUmiStreetCanyonChannelConditionModel> ()
+  ;
+  return tid;
+}
+
+ThreeGppAerialUmiStreetCanyonChannelConditionModel::ThreeGppAerialUmiStreetCanyonChannelConditionModel ()
+  : ThreeGppChannelConditionModel ()
+{
+}
+
+ThreeGppAerialUmiStreetCanyonChannelConditionModel::~ThreeGppAerialUmiStreetCanyonChannelConditionModel ()
+{
+}
+//UMi-Street for Aerial UE Cannon // added by sjkang
+double
+ThreeGppAerialUmiStreetCanyonChannelConditionModel::ComputePlos (Ptr<const MobilityModel> a,
+                                                           Ptr<const MobilityModel> b) const
+{
+  // compute the 2D distance between a and b
+  double distance2D = Calculate2dDistance (a->GetPosition (), b->GetPosition ());
+
+  // NOTE: no idication is given about the UT height used to derive the
+  // LOS probability
+
+  // h_BS should be equal to 10 m. We check if at least one of the two
+  // nodes has height equal to 10 m
+  if (a->GetPosition ().z != 10.0 && b->GetPosition ().z != 10.0)
+    {
+      NS_LOG_WARN ("The LOS probability was derived assuming BS antenna heights of 10 m (see TR 36.777, Table B-1)");
+    }
+
+  // compute the LOS probability (see 3GPP TR 36.777, Table B-1 LOS probability)
+  double h_UT = std::max(a->GetPosition().z, b->GetPosition().z);
+
+  double pLos = 0.0;
+
+  if (h_UT > 300  and h_UT <1.5)
+  {
+        NS_LOG_WARN ("The LOS probability was derived assuming UAV heights of 10 to 300 m (see TR 36.777, Table B-1)");
+      }
+
+  if (h_UT <= 22.5 and h_UT >1.5){
+	  if (distance2D <= 18.0)
+	  {
+		  pLos = 1.0;
+	  }
+	  else
+	  {
+		  pLos = 18.0 / distance2D + exp (-distance2D / 36.0) * (1.0 - 18.0 / distance2D);
+	  }
+  }
+  else if (h_UT> 22.5 && h_UT < 300){
+	  double t = 294.05*std::log10(h_UT)-432.94;
+	  double d1;
+	  if (t>= 18.0)
+		  d1 = t;
+	   else
+		 d1 = 18.0;
+	  double p1 = 233.98*std::log10(h_UT) - 0.95;
+
+	  if (distance2D <= d1)
+		  pLos = 1.0;
+	  else
+		  pLos = d1/distance2D + exp(-distance2D/p1)*(1-d1/distance2D);
+      ///std::cout <<h_UT<<'\t'<< pLos<<std::endl;
+
+  }
 
   return pLos;
 }

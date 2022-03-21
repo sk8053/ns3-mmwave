@@ -225,6 +225,11 @@ ThreeGppChannelModel::GetTypeId (void)
                    IntegerValue (4),
                    MakeIntegerAccessor (&ThreeGppChannelModel::m_numNonSelfBlocking),
                    MakeIntegerChecker<uint16_t> ())
+	.AddAttribute ("AerialFadingMode",
+				   "true for aerial, false for terrestrial fading model",
+				   BooleanValue (false),
+				   MakeBooleanAccessor (&ThreeGppChannelModel:: m_aerial_fading),
+				   MakeBooleanChecker())
     .AddAttribute ("PortraitMode",
                    "true for portrait mode, false for landscape mode",
                    BooleanValue (true),
@@ -261,7 +266,7 @@ void
 ThreeGppChannelModel::SetFrequency (double f)
 {
   NS_LOG_FUNCTION (this);
-  NS_ASSERT_MSG (f >= 500.0e6 && f <= 100.0e9, "Frequency should be between 0.5 and 100 GHz but is " << f);
+  //NS_ASSERT_MSG (f >= 500.0e6 && f <= 100.0e9, "Frequency should be between 0.5 and 100 GHz but is " << f);
   m_frequency = f;
 }
 
@@ -302,6 +307,7 @@ ThreeGppChannelModel::GetThreeGppTable (bool los, bool o2i, double hBS, double h
   // cDS, cASD, cASA, cZSA, uK, sigK, rTau, uXpr, sigXpr, shadowingStd
 
   // In NLOS case, parameter uK and sigK are not used and they are set to 0
+
   if (m_scenario == "RMa")
     {
       if (los && !o2i)
@@ -550,8 +556,8 @@ ThreeGppChannelModel::GetThreeGppTable (bool los, bool o2i, double hBS, double h
           table3gpp->m_cASD = 3;
           table3gpp->m_cASA = 17;
           table3gpp->m_cZSA = 7;
-          table3gpp->m_uK = 9;
-          table3gpp->m_sigK = 5;
+          table3gpp->m_uK = 9; //mean of   K factor, SJ
+          table3gpp->m_sigK = 5; // variance of K factor, SJ
           table3gpp->m_rTau = 3;
           table3gpp->m_uXpr = 9;
           table3gpp->m_sigXpr = 3;
@@ -825,6 +831,7 @@ ThreeGppChannelModel::GetNewChannel (Vector locUT, bool los, bool o2i,
 
   NS_ASSERT_MSG (m_frequency > 0.0, "Set the operating frequency first!");
 
+
   // get the 3GPP parameters
   Ptr<const ParamsTable> table3gpp = GetThreeGppTable (los, o2i, hBS, hUT, dis2D);
 
@@ -872,7 +879,11 @@ ThreeGppChannelModel::GetNewChannel (Vector locUT, bool los, bool o2i,
   double DS,ASD,ASA,ZSA,ZSD,K_factor = 0;
   if (los)
     {
-      K_factor = LSPs[1] * table3gpp->m_sigK + table3gpp->m_uK;
+      if (m_aerial_fading)
+    	  K_factor = 15;
+      else
+	  	  K_factor =LSPs[1] * table3gpp->m_sigK + table3gpp->m_uK;//SJ
+      //std::cout <<"Kfactor ->"<< K_factor<<" "<<m_aerial_fading<< std::endl;
       DS = pow (10, LSPs[2] * table3gpp->m_sigLgDS + table3gpp->m_uLgDS);
       ASD = pow (10, LSPs[3] * table3gpp->m_sigLgASD + table3gpp->m_uLgASD);
       ASA = pow (10, LSPs[4] * table3gpp->m_sigLgASA + table3gpp->m_uLgASA);

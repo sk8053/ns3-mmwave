@@ -241,6 +241,7 @@ private:
   std::unordered_map<uint32_t, Ptr<ThreeGppChannelMatrix> > m_channelMap; //!< map containing the channel realizations
   Time m_updatePeriod; //!< the channel update period
   double m_frequency; //!< the operating frequency
+  bool m_aerial_fading = false; // the value of K-factor for large scale fading of LOS
   std::string m_scenario; //!< the 3GPP scenario
   Ptr<ChannelConditionModel> m_channelConditionModel; //!< the channel condition model
   Ptr<UniformRandomVariable> m_uniformRv; //!< uniform random variable

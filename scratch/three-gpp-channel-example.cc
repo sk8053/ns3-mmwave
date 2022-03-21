@@ -197,7 +197,7 @@ static void RayTracing ( Ptr<MobilityModel> * MobPair, double* delay, double * p
   //uint8_t k = 0;
   for (uint8_t i = 0 ; i < n_cluster; i++){
  
-    Pathloss_gain[i] = -10*log10(*(power+i)) + propagationGainDb;
+    Pathloss_gain[i] =   -10*log10(*(power+i)) + propagationGainDb;
    // for (uint8_t j = 0; j<n_rays;j++){
    //   Zod[i][j] = *(zod+k);
    //   Zoa[i][j] = *(zoa+k);
@@ -217,9 +217,8 @@ static void RayTracing ( Ptr<MobilityModel> * MobPair, double* delay, double * p
   f.open ("ray_tracing.txt",  std::ios::app);
   f<<"path_number" <<'\t'<< n_cluster  << std::endl;
  uint16_t link_state = cond_model->GetChannelCondition(txMob,rxMob)->GetLosCondition();
-//if (link_state == 1)
-//	link_state = 2; 
-link_state++;
+
+  link_state++; // 1-> LOS, 2-> NLOS
   f<<"link_state" <<'\t'<< link_state << std::endl;
   //std::cout<<cond_model->GetChannelCondition(txMob,rxMob)->GetLosCondition();
   f<< "TX"<<'\t'<<txMob->GetPosition().x << '\t' << txMob->GetPosition().y << '\t'<< txMob->GetPosition().z<< std::endl;
@@ -239,7 +238,7 @@ link_state++;
   write_file_cluster_only(Zoa_c, &f, n_cluster,  "zoa");
   write_file_cluster_only(Aod_c, &f,  n_cluster, "aod");
   write_file_cluster_only(Aoa_c, &f, n_cluster,  "aoa");
-
+  //f.close();
 //  NS_LOG_INFO ("sample data"<<"\t" <<Simulator::Now().GetSeconds()<<'\t'<< Delay[0] <<'\t'<< Pathloss_gain[0]<<"\t"<<Aoa[0][0]<<"\t"<<Aod[0][0]<<"\t"<<Zoa[0][0]<<"\t"<<Zod[0][0]);
 }
 
@@ -268,7 +267,6 @@ void SetPosition(Ptr<MobilityModel> txMob, Ptr<MobilityModel> rxMob, std::vector
   *(rxPsd) *= propagationGainLinear;
   rxPsd = m_spectrumLossModel->CalcRxPowerSpectralDensity (rxPsd, txMob, rxMob);
 
-  
  // std::cout << i << std::endl;
   Simulator::Schedule (MilliSeconds (2), &SetPosition, txMob, rxMob, tx_loc, rx_loc, i+1);
 }
@@ -277,11 +275,22 @@ int
 main (int argc, char *argv[])
 {
  double frequency= 28.0e9;
+ bool aerial_fading = true;
+
 
  CommandLine cmd;
  cmd.AddValue("frequency", "carrier frequency", frequency);
+ cmd.AddValue("aerial_fading", "set K factor for large scale fading for aerial channel", aerial_fading);
+ //cmd.AddValue ("scenario", "3gpp scenario", scenario);
+
  cmd.Parse(argc, argv);
  std::cout<< frequency<<std::endl; 
+ std::cout<<"Aerial Fading, " << aerial_fading<<std::endl;
+
+
+ std::string scenario = "UMi-StreetCanyon"; // 3GPP propagation scenario
+ std::cout <<scenario<< std::endl;
+
   std::string line;
 
   std::vector<Vector> tx_loc, rx_loc;
@@ -298,26 +307,31 @@ main (int argc, char *argv[])
       std::getline(iss, y, '\t' );
       std::getline(iss, z, '\t' );
     
-      if (ind == "tx")
+      if (ind == "tx"){
         tx_loc.push_back(Vector(stod(x), stod(y), stod(z)));
-      else
+        //std::cout<<"tx"<<"\t"<<x<<"\t"<<y<<"\t" <<z<<std::endl;
+        }
+      else{
         rx_loc.push_back(Vector(stod(x), stod(y), stod(z)));
+        //std::cout<<"rx"<<"\t"<<x<<"\t"<<y<<"\t"<<z<<std::endl;
+        }
 
   }
-  f.close();
+ f.close();
   //double txPow = 65.0; // tx power in dBm
  // double noiseFigure = 6.0; // noise figure in dB
-  uint16_t u_time = 1; //update time
+  uint16_t u_time = 1.0; //update time
   uint32_t simTime =u_time *tx_loc.size()*2; // simulation time in milliseconds
   std::cout <<"simulation time (milliseconds): " << simTime << std::endl; 
  // uint32_t timeRes = 1.5; // time resolution in milliseconds
-  std::string scenario = "UMi-StreetCanyon"; // 3GPP propagation scenario
+
 
   Config::SetDefault ("ns3::ThreeGppChannelModel::UpdatePeriod", TimeValue(MilliSeconds (u_time))); // update the channel at each iteration
-  Config::SetDefault ("ns3::ThreeGppChannelConditionModel::UpdatePeriod", TimeValue(MilliSeconds (u_time))); // do not update the channel condition
+  Config::SetDefault ("ns3::ThreeGppChannelModel::AerialFadingMode", BooleanValue(aerial_fading)); // update the channel at each iteration
 
-  RngSeedManager::SetSeed(1);
-  RngSeedManager::SetRun(1);
+  Config::SetDefault ("ns3::ThreeGppChannelConditionModel::UpdatePeriod", TimeValue(MilliSeconds (u_time))); // do not update the channel condition
+  srand(time(0));
+
 
   // create and configure the factories for the channel condition and propagation loss models
   ObjectFactory propagationLossModelFactory;
@@ -332,10 +346,17 @@ main (int argc, char *argv[])
     propagationLossModelFactory.SetTypeId (ThreeGppUmaPropagationLossModel::GetTypeId ());
     channelConditionModelFactory.SetTypeId (ThreeGppUmaChannelConditionModel::GetTypeId ());
   }
-  else if (scenario == "UMi-StreetCanyon")
+  else if (scenario == "UMi-StreetCanyon" && aerial_fading == false)
   {
-    propagationLossModelFactory.SetTypeId (ThreeGppUmiStreetCanyonPropagationLossModel::GetTypeId ());
+    std::cout<<"UMi-Street Cannyon"<< std::endl;
+	propagationLossModelFactory.SetTypeId (ThreeGppUmiStreetCanyonPropagationLossModel::GetTypeId ());
     channelConditionModelFactory.SetTypeId (ThreeGppUmiStreetCanyonChannelConditionModel::GetTypeId ());
+  }
+  else if (scenario == "UMi-StreetCanyon" && aerial_fading == true){
+	  std::cout<<"UMi-Street Cannyon for Aerial"<< std::endl;
+		propagationLossModelFactory.SetTypeId (ThreeGppAerialUmiStreetCanyonPropagationLossModel::GetTypeId ());
+	    channelConditionModelFactory.SetTypeId (ThreeGppAerialUmiStreetCanyonChannelConditionModel::GetTypeId ());
+
   }
   else if (scenario == "InH-OfficeOpen")
   {
@@ -365,7 +386,11 @@ main (int argc, char *argv[])
   // create the channel condition model and associate it with the spectrum and
   // propagation loss model
   Ptr<ChannelConditionModel> condModel = channelConditionModelFactory.Create<ThreeGppChannelConditionModel> ();
+  //Ptr<ChannelConditionModel> condModel = channelConditionModelFactory.Create<ThreeGppChannelModel> ();
+
   m_spectrumLossModel->SetChannelModelAttribute ("ChannelConditionModel", PointerValue (condModel));
+  //m_spectrumLossModel->SetChannelModelAttribute ("ThreeGppChannelModel", PointerValue (condModel));
+
   m_propagationLossModel->SetChannelConditionModel (condModel);
   //Ptr<MmWaveHelper> mmwaveHelper = CreateObject<MmWaveHelper> ();
 

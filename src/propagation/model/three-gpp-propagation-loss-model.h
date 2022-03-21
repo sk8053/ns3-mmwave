@@ -525,6 +525,102 @@ private:
    */
   std::pair<double, double> GetUtAndBsHeights (double za, double zb) const override;
 };
+/**
+ * \ingroup propagation
+ * \ added by SJ kang
+ * \brief Implements the pathloss model defined in 3GPP TR 3.77, Table B-2
+ *        for the UMi-Street Canyon scenario for aerial UEs
+ */
+class ThreeGppAerialUmiStreetCanyonPropagationLossModel : public ThreeGppPropagationLossModel
+{
+public:
+  /**
+   * \brief Get the type ID.
+   * \return the object TypeId
+   */
+  static TypeId GetTypeId (void);
+
+  /**
+   * Constructor
+   */
+  ThreeGppAerialUmiStreetCanyonPropagationLossModel ();
+
+  /**
+   * Destructor
+   */
+  virtual ~ThreeGppAerialUmiStreetCanyonPropagationLossModel () override;
+
+  /**
+   * \brief Copy constructor
+   *
+   * Defined and unimplemented to avoid misuse
+   */
+  ThreeGppAerialUmiStreetCanyonPropagationLossModel (const ThreeGppAerialUmiStreetCanyonPropagationLossModel &) = delete;
+
+  /**
+   * \brief Copy constructor
+   *
+   * Defined and unimplemented to avoid misuse
+   * \return the ThreeGppUmiStreetCanyonPropagationLossModel instance
+   */
+  ThreeGppAerialUmiStreetCanyonPropagationLossModel & operator = (const ThreeGppAerialUmiStreetCanyonPropagationLossModel &) = delete;
+
+private:
+  /**
+   * \brief Computes the pathloss between a and b considering that the line of
+   *        sight is not obstructed
+   * \param distance2D the 2D distance between tx and rx in meters
+   * \param distance3D the 3D distance between tx and rx in meters
+   * \param hUt the height of the UT in meters
+   * \param hBs the height of the BS in meters
+   * \return pathloss value in dB
+   */
+  double GetLossLos (double distance2D, double distance3D, double hUt, double hBs) const override;
+
+  /**
+   * \brief Computes the pathloss between a and b considering that the line of
+   *        sight is obstructed.
+   * \param distance2D the 2D distance between tx and rx in meters
+   * \param distance3D the 3D distance between tx and rx in meters
+   * \param hUt the height of the UT in meters
+   * \param hBs the height of the BS in meters
+   * \return pathloss value in dB
+   */
+  double GetLossNlos (double distance2D, double distance3D, double hUt, double hBs) const override;
+
+  /**
+   * \brief Returns the shadow fading standard deviation
+   * \param a tx mobility model
+   * \param b rx mobility model
+   * \param cond the LOS/NLOS channel condition
+   * \return shadowing std in dB
+   */
+  virtual double GetShadowingStd (Ptr<MobilityModel> a, Ptr<MobilityModel> b, ChannelCondition::LosConditionValue cond) const override;
+
+  /**
+   * \brief Returns the shadow fading correlation distance
+   * \param cond the LOS/NLOS channel condition
+   * \return shadowing correlation distance in meters
+   */
+  virtual double GetShadowingCorrelationDistance (ChannelCondition::LosConditionValue cond) const override;
+
+  /**
+   * \brief Computes the breakpoint distance
+   * \param hUt height of the UT node in meters
+   * \param hBs height of the BS node in meters
+   * \param distance2D distance between the two nodes in meters
+   * \return the breakpoint distance in meters
+   */
+  double GetBpDistance (double hUt, double hBs, double distance2D) const;
+
+  /**
+   * \brief Determines hUT and hBS. Overrides the default implementation.
+   * \param za the height of the first node in meters
+   * \param zb the height of the second node in meters
+   * \return std::pair, the first element is hUt and the second is hBs
+   */
+  std::pair<double, double> GetUtAndBsHeights (double za, double zb) const override;
+};
 
 /**
  * \ingroup propagation
